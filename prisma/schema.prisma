@@ -1,0 +1,136 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  ADMIN
+  MANAGER
+  MEMBER
+  VIEWER
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  role          UserRole  @default(MEMBER)
+  accounts      Account[]
+  sessions      Session[]
+  
+  // Relations
+  links         Link[]
+  utmTemplates  UTMTemplate[]
+  
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model Link {
+  id          String    @id @default(cuid())
+  alias       String    @unique
+  originalUrl String    @db.Text
+  shortUrl    String?   // Optional full short URL cached
+  
+  // Metadata for UTM (stored separately for reference/editing if needed, or just part of originalUrl)
+  utmSource   String?
+  utmMedium   String?
+  utmCampaign String?
+  utmTerm     String?
+  utmContent  String?
+
+  qrCode      String?   // Base64 or URL to QR code image
+  
+  clicks      Click[]
+  
+  creatorId   String
+  creator     User      @relation(fields: [creatorId], references: [id])
+  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  expiresAt   DateTime?
+  
+  @@index([creatorId])
+  @@index([alias])
+}
+
+model Click {
+  id        String   @id @default(cuid())
+  linkId    String
+  link      Link     @relation(fields: [linkId], references: [id], onDelete: Cascade)
+  
+  ipHash    String?
+  userAgent String?
+  country   String?
+  city      String?
+  referer   String?
+  
+  timestamp DateTime @default(now())
+  
+  @@index([linkId])
+  @@index([timestamp])
+}
+
+model UTMTemplate {
+  id          String   @id @default(cuid())
+  name        String
+  
+  source      String?
+  medium      String?
+  campaign    String?
+  term        String?
+  content     String?
+  
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([userId])
+}
+
+// NextAuth.js Models
+model Account {
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+ 
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+ 
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+ 
+  @@id([provider, providerAccountId])
+}
+ 
+model Session {
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+ 
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+ 
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+ 
+  @@id([identifier, token])
+}
